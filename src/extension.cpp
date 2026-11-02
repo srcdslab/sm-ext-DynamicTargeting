@@ -120,6 +120,8 @@ bool DynamicTargeting::ProcessCommandTarget(cmd_target_info_t *info)
 	/* Mirror core's partial name matching: the lookup is ambiguous as soon as
 	 * two names match, whether or not the admin can target them. Only the
 	 * clients the admin can target are reported.
+	 * A processor registered after this one that resolves plain names is only
+	 * asked after this one, so the menu may be offered for a lookup it claims.
 	 */
 	int matches = 0;
 	std::vector<cell_t> clients;

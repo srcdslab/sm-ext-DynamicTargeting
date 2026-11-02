@@ -31,6 +31,13 @@ The menu is only shown when all of these are true:
 
 Patterns starting with `@` are left to SourceMod and to other target processors.
 
+## Limitations
+
+- **Do not run it with a SourceMod build that has [1f6a0782d](https://github.com/srcdslab/sourcemod/commit/1f6a0782d2e026136727ce11644b8fe4cfdc3295)** (BotoX's core patch: `GetLastProcessTargetString`, `IsCommandCallback` and the menu in `ReplyToTargetError`), or both menus open. It is not on any maintained branch of srcdslab/sourcemod (`master`, `1.11-dev`, `1.11-dev-fork`, `1.13-7427`, `master-sp1`); only builds made from the old fork have it.
+- Only the first argument equal to the pattern is replaced: `sm_rename ene ene` re-runs as `sm_rename #12 ene`. For a command with two targets, each ambiguous lookup opens its own menu and only the last one stays.
+- A target processor registered after this one (another extension, or one loaded later) that resolves plain names still runs after the menu was offered.
+- A plugin that does the lookup later than the command itself (from a timer or the next frame) gets no menu: the plugin only acts in the tick of the command.
+
 ## Configuration
 
 | ConVar | Default | Description |
