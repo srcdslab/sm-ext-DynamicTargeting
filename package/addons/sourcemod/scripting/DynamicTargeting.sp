@@ -4,7 +4,7 @@
 #include <sourcemod>
 #include <dynamictargeting>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 
 /* FakeClientCommand() formats the command into a 256 byte buffer. */
 #define MAX_COMMAND_LINE_LENGTH 256
@@ -35,6 +35,10 @@ ReplySource g_PendingReplySource[MAXPLAYERS + 1];
 char g_sPendingCmdStart[MAXPLAYERS + 1][MAX_COMMAND_LINE_LENGTH];
 char g_sPendingCmdEnd[MAXPLAYERS + 1][MAX_COMMAND_LINE_LENGTH];
 
+/* Menu displayed to each admin, cancelled in OnPluginEnd: SourceMod crashes
+ * when a plugin is unloaded while one of its menus is still displayed. */
+Menu g_hMenu[MAXPLAYERS + 1];
+
 /* Used to sort the menu by name. */
 char g_sSortNames[MAXPLAYERS + 1][MAX_NAME_LENGTH];
 
@@ -46,6 +50,16 @@ public void OnPluginStart()
 	AutoExecConfig(true);
 
 	AddCommandListener(Listener_AnyCommand);
+}
+
+public void OnPluginEnd()
+{
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		/* Cancel() ends the menu, and MenuAction_End clears the slot. */
+		if (g_hMenu[client] != null)
+			g_hMenu[client].Cancel();
+	}
 }
 
 public void OnClientDisconnect(int client)
@@ -131,7 +145,10 @@ void DisplayAmbiguousMenu(int admin, const char[] pattern, const int[] clients, 
 		menu.AddItem(sUserId, sDisplay);
 	}
 
-	menu.Display(admin, MENU_TIME_FOREVER);
+	/* Displaying this menu ends the admin's previous one, which clears its
+	 * slot, so only store the new menu afterwards. */
+	if (menu.Display(admin, MENU_TIME_FOREVER))
+		g_hMenu[admin] = menu;
 }
 
 int SortByName(int elem1, int elem2, const int[] array, Handle hndl)
@@ -145,6 +162,12 @@ public int MenuHandler_Ambiguous(Menu menu, MenuAction action, int param1, int p
 	{
 		case MenuAction_End:
 		{
+			for (int client = 1; client <= MaxClients; client++)
+			{
+				if (g_hMenu[client] == menu)
+					g_hMenu[client] = null;
+			}
+
 			delete menu;
 		}
 		case MenuAction_DrawItem:
