@@ -204,8 +204,14 @@ public int MenuHandler_Ambiguous(Menu menu, MenuAction action, int param1, int p
 
 /**
  * Finds the first argument of a command argument string that is equal to
- * pattern, splitting arguments on whitespace and double quotes like
- * BreakString() does.
+ * pattern, splitting arguments the way the engine does (CCommand::Tokenize,
+ * CUtlBuffer::ParseToken), so that it agrees with GetCmdArg():
+ * - "{}()':" are arguments of their own, even without spaces around them;
+ * - a double quote starts and ends a quoted argument;
+ * - an unquoted argument ends at whitespace, a quote, one of "{}()':", or a
+ *   byte >= 0x80 (the engine compares a signed char with ' '), so "Jose" with
+ *   an accented letter splits after the first byte of that letter;
+ * - "//" starts a comment that runs to the end of the line.
  *
  * @param args      Command argument string.
  * @param pattern   Argument to look for.
@@ -219,10 +225,10 @@ int FindArgument(const char[] args, const char[] pattern, int &length)
 
 	while (args[pos] != '\0')
 	{
-		while (args[pos] != '\0' && IsCharSpace(args[pos]))
+		while (args[pos] != '\0' && IsEngineSpace(args[pos]))
 			pos++;
 
-		if (args[pos] == '\0')
+		if (args[pos] == '\0' || (args[pos] == '/' && args[pos + 1] == '/'))
 			break;
 
 		int start = pos;
@@ -237,9 +243,15 @@ int FindArgument(const char[] args, const char[] pattern, int &length)
 			if (args[pos] == '"')
 				pos++;
 		}
+		else if (IsEngineBreak(args[pos]))
+		{
+			arg[len++] = args[pos++];
+		}
 		else
 		{
-			while (args[pos] != '\0' && !IsCharSpace(args[pos]))
+			/* The first byte is always part of the argument. */
+			arg[len++] = args[pos++];
+			while (args[pos] != '\0' && !IsEngineBreak(args[pos]) && args[pos] != '"' && !IsEngineWordEnd(args[pos]))
 				arg[len++] = args[pos++];
 		}
 
@@ -253,4 +265,24 @@ int FindArgument(const char[] args, const char[] pattern, int &length)
 	}
 
 	return -1;
+}
+
+/* isspace() in the C locale, as used by CUtlBuffer::EatWhiteSpace(). */
+bool IsEngineSpace(int c)
+{
+	c &= 0xFF;
+	return c == ' ' || (c >= '\t' && c <= '\r');
+}
+
+/* The default break set of CCommand::Tokenize(). */
+bool IsEngineBreak(int c)
+{
+	return c == '{' || c == '}' || c == '(' || c == ')' || c == '\'' || c == ':';
+}
+
+/* CUtlBuffer::ParseToken() ends a word on a signed char <= ' '. */
+bool IsEngineWordEnd(int c)
+{
+	c &= 0xFF;
+	return c <= ' ' || c >= 0x80;
 }
